@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+
+        {
+            "name": "Run Reasonir Task",
+            "type": "debugpy",
+            "request": "launch",
+            // "program": "./evaluation/bright/run.py",
+            "program": "run.py",
+            "cwd": "${workspaceFolder}/evaluation/bright",
+            "args": [
+                "--task", "theoremqa_theorems",
+                "--model", "reasonir",
+                "--output_dir", "output/reasonir_debug",
+                "--cache_dir", "cache",
+                "--reasoning", "gpt4",
+                "--encode_batch_size", "-1",
+                // "--debug"
+            ],
+            "console": "integratedTerminal"
+        },
+    ]
+}

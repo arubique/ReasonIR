@@ -1,6 +1,7 @@
 bitsandbytes
 pytrec-eval
 tqdm
+torch==2.1.2
 transformers==4.47.0
 tiktoken
 scipy
@@ -13,6 +14,7 @@ fasttext
 nltk
 sentence-transformers
 hf_transfer
+datasets
 # cohere==4.36
 # voyageai
 # vertexai
