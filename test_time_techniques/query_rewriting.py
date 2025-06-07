@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 
 def call_api(func):
-    count = 0 
+    count = 0
     while True:
         try:
             count += 1
@@ -57,11 +57,11 @@ class ClaudeModel:
     def generate(self, prompt):
         inputs = format_chat(prompt, include_system=False)
         func = functools.partial(
-            self.model.messages.create, 
-            max_tokens=2048, 
-            messages=inputs, 
-            model=self.version, 
-            temperature=0.8, 
+            self.model.messages.create,
+            max_tokens=2048,
+            messages=inputs,
+            model=self.version,
+            temperature=0.8,
             top_p=0.8
         )
         message = call_api(func)
@@ -69,13 +69,15 @@ class ClaudeModel:
             response = json.loads(message.model_dump_json(indent=2))
             return response['content'][0]['text']
         return None
-    
+
 
 class OpenAIModel:
     def __init__(self, model_name, temperature=0.8, top_p=0.8, max_tokens=2048):
         import openai
+        # if api_key is not None:
+        #     openai.api_key = api_key
         if "azure" in model_name:
-            # env var: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and OPENAI_API_VERSION 
+            # env var: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, and OPENAI_API_VERSION
             self.model = openai.AzureOpenAI()
             model_name = model_name[model_name.index("/")+1:]
         else:
@@ -90,9 +92,9 @@ class OpenAIModel:
         # kwargs can be used to pass additional parameters to the model: max_tokens, stop, etc.
         inputs = format_chat(prompt, system_message=system_message)
         func = functools.partial(
-            self.model.chat.completions.create, 
-            model=self.model_name, 
-            messages=inputs, 
+            self.model.chat.completions.create,
+            model=self.model_name,
+            messages=inputs,
             max_tokens=self.max_tokens,
             temperature=self.temperature,
             top_p=self.top_p,
@@ -144,13 +146,13 @@ class HFModel:
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
-    
+
     def generate(self, message, **kwargs):
         inputs = self.tokenizer([message], return_tensors="pt").to(self.device)
         outputs = self.model.generate(
             **inputs,
             # max_length=1024,
-            max_new_tokens=512, # added for llama3.1-7B, because max_length runs into errors. 
+            max_new_tokens=512, # added for llama3.1-7B, because max_length runs into errors.
             temperature=self.temperature,
             top_p=self.top_p,
             **kwargs,
@@ -167,7 +169,12 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default="gemini-1.5-flash")
     parser.add_argument('--output_token_limit', type=int, default=None)
     parser.add_argument('--sweep_output_dir', type=str, default=None)
+    parser.add_argument('--api_key', type=str, default=None)
     args = parser.parse_args()
+
+    if args.api_key is not None:
+        with open(args.api_key, 'r') as f:
+            os.environ["OPENAI_API_KEY"] = f.read().strip()
 
     if args.example_file is not None:
         # supports json and jsonl files
@@ -181,9 +188,9 @@ if __name__ == '__main__':
 
     if os.path.exists(output_file):
         print(f"{output_file} exists, skipping")
-    
+
     else:
-    
+
         if 'claude' in args.model:
             model = ClaudeModel(version=args.model)
         elif 'gpt' in args.model:
