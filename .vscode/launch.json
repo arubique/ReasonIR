@@ -69,11 +69,12 @@
                 "meta-llama/Llama-3.1-8B-Instruct",
                 // "gpt-4o",
                 // "gpt-3.5-turbo",
-                "--output_dir", "output/documents_augmentation_llama3",
+                "--output_dir", "output/documents_augmentation_llama3_debug",
                 // "--cache_dir", "cache",
                 // "--api_key",
                 // "~/.config/openai_api_key"
                 // "~/.config/openai_api_key_bright"
+                "--doc_id_range", "0:3"
             ]
         },
     ]
