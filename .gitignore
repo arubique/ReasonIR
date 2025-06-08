@@ -11,6 +11,7 @@ evaluation/bright/results/
 evaluation/bright/output/
 evaluation/bright/*.pkl
 evaluation/bright/biology/*.pkl
+output
 
 
 # Byte-compiled / optimized / DLL files
