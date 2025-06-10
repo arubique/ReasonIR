@@ -7,6 +7,9 @@ from tqdm import tqdm
 import functools
 
 import logging
+
+# local imports
+from utility.utils import get_device_with_most_free_memory
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
                     datefmt='%m/%d/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
@@ -141,7 +144,8 @@ class HFModel:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = get_device_with_most_free_memory()
         self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
         self.temperature = temperature
         self.top_p = top_p
