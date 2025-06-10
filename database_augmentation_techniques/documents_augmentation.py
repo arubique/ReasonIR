@@ -225,7 +225,10 @@ if __name__ == '__main__':
 
     os.makedirs(args.output_dir, exist_ok=True)
     model_name = args.model.split("/")[-1]
-    output_file = os.path.join(args.output_dir, f"{args.task}_{model_name}_{args.output_token_limit}.parquet")
+    output_file = os.path.join(
+        args.output_dir,
+        f"{args.task}_{model_name}_{args.output_token_limit}_{args.doc_id_range}.parquet"
+    )
 
     if os.path.exists(output_file):
         print(f"{output_file} exists, skipping")
