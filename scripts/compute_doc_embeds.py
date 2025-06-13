@@ -65,7 +65,7 @@ def main():
     doc_emb = compute_doc_embeds(
         documents=documents_augmented,
         task="theoremqa_theorems",
-        save_path="/home/oh/arubinstein17/github/ReasonIR/evaluation/bright/theoremqa_theorems/augmented_doc_emb.pkl"
+        save_path=args.save_path
     )
 
 

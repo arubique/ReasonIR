@@ -28,8 +28,8 @@
                 "--model", "reasonir",
                 "--output_dir", "output/reasonir_debug",
                 "--cache_dir", "cache",
-                "--reasoning",
-                "gpt4",
+                // "--reasoning",
+                // "gpt4",
                 "--encode_batch_size", "-1",
                 // "--debug"
             ],
@@ -74,7 +74,8 @@
                 // "--api_key",
                 // "~/.config/openai_api_key"
                 // "~/.config/openai_api_key_bright"
-                "--doc_id_range", "0:3"
+                "--doc_id_range", "0:3",
+                "--doc_type", "queries"
             ]
         },
     ]
