@@ -7,12 +7,27 @@ from vllm import LLM, SamplingParams
 from datasets import load_dataset
 import torch
 import prompts
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from utility.utils import get_device_with_most_free_memory
+sys.path.pop(0)
 
 class Reranker:
-    def __init__(self, task):
+    def __init__(self, task, device_count=None, device=None):
         model_name = "Qwen/Qwen2.5-32B-Instruct"
-        self.sampling_params = SamplingParams(temperature=0.6, top_p=0.9, max_tokens=32, logprobs=10)
-        self.model = LLM(model=model_name, dtype="bfloat16", tensor_parallel_size=torch.cuda.device_count(), max_model_len=16384)
+        if device_count is None:
+            device_count = torch.cuda.device_count()
+        if device is None:
+            device = get_device_with_most_free_memory()
+        self.sampling_params = SamplingParams(temperature=0.6, top_p=0.9, max_tokens=32, logprobs=5)
+        self.model = LLM(
+            model=model_name,
+            dtype="bfloat16",
+            tensor_parallel_size=device_count,
+            max_model_len=16384,
+            device=device
+        )
 
         retrieval_dict = {
                 "aops": prompts.bright_aops,
@@ -25,19 +40,18 @@ class Reranker:
             self.prompt = retrieval_dict[task]
         else:
             self.prompt = prompts.bright_general
-        
+
         # set random seed
         torch.manual_seed(42)
 
-    def rerank(self, docs, query, topk):
+    def rerank(self, docs, query, topk, batch_size=50):
         scores = []
 
-        batch_size = 50
-        for i in range(0, len(docs), batch_size):
+        for i in tqdm(range(0, len(docs), batch_size)):
             list_docs = docs[i:i+batch_size]
 
             doc_prompts = [self.prompt.format(query, doc["text"]) for doc in list_docs]
-            
+
             output = self.model.generate(doc_prompts, self.sampling_params)
             doc_prompt_outputs = [o.outputs[0].text for o in output]
 
@@ -54,9 +68,9 @@ class Reranker:
                 else:
                     scores.append(0)
 
-        
+
         ranking = {doc["id"]: score for doc, score in zip(docs, scores)}
-        ranking = dict(sorted(ranking.items(), key=lambda item: item[1], reverse=True)[:topk])   
+        ranking = dict(sorted(ranking.items(), key=lambda item: item[1], reverse=True)[:topk])
         return ranking
 
 
@@ -73,6 +87,7 @@ if __name__=='__main__':
     parser.add_argument('--reasoning', type=str, default=None)
     parser.add_argument('--bm25_score_file', type=str, default=None)
     parser.add_argument('--output_dir', type=str, default=None)
+    parser.add_argument('--batch_size', type=int, default=50)
     args = parser.parse_args()
 
     if args.reasoning is not None:
@@ -91,7 +106,7 @@ if __name__=='__main__':
     documents = {}
     for d in doc_pairs:
         documents[d['id']] = d['content']
-    
+
     with open(args.retriever_score_file) as f:
         all_scores = json.load(f)
 
@@ -101,7 +116,7 @@ if __name__=='__main__':
     if not os.path.isfile(score_file_path):
         new_scores = copy.deepcopy(all_scores)
 
-        model = Reranker(args.task)
+        model = Reranker(args.task, device_count=1, device=get_device_with_most_free_memory())
 
         for qid,scores in tqdm(all_scores.items()):
             docs = []
@@ -109,10 +124,15 @@ if __name__=='__main__':
             for did, _ in sorted_scores:
                 docs.append([did, documents[did]])
 
-            ctxs = [{'id': did, 'text': documents[did]} for did, _ in sorted_scores]            
+            ctxs = [{'id': did, 'text': documents[did]} for did, _ in sorted_scores]
 
-            cur_score = model.rerank(query=examples[qid]['query'], docs=ctxs, topk=args.k)
-            
+            cur_score = model.rerank(
+                query=examples[qid]['query'],
+                docs=ctxs,
+                topk=args.k,
+                batch_size=args.batch_size
+            )
+
             assert len(cur_score) == len(sorted_scores)
 
             new_scores[qid] = cur_score
