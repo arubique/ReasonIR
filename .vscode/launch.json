@@ -29,6 +29,31 @@
             // "justMyCode": false
         },
         {
+            "name": "Run Reranker",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "reranker.py",
+            "cwd": "${workspaceFolder}/evaluation/bright",
+            "args": [
+                "--task",
+                "theoremqa_theorems",
+                "--retriever_score_file",
+                "./output/reasonir_gpt4_reasoning/theoremqa_theorems_reasonir_long_False/gpt4_score.json",
+                "--input_k",
+                "100",
+                "--k",
+                "100",
+                "--output_dir",
+                "output/reranker/theoremqa_theorems_reasonir_long_False/",
+                "--reasoning",
+                "gpt4",
+                "--batch_size",
+                "50"
+            ],
+            "console": "integratedTerminal",
+            // "justMyCode": false
+        },
+        {
             "name": "Query Rewriting",
             "type": "debugpy",
             "request": "launch",
