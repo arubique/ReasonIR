@@ -6,14 +6,6 @@
     "configurations": [
 
         {
-            "name": "Python Debugger: Current File",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
-        },
-
-        {
             "name": "Run Reasonir Task",
             "type": "debugpy",
             "request": "launch",
@@ -57,7 +49,7 @@
             ]
         },
         {
-            "name": "Documents Rewriting",
+            "name": "Documents augmentation",
             "type": "debugpy",
             "request": "launch",
             "program": "database_augmentation_techniques/documents_augmentation.py",
@@ -75,7 +67,10 @@
                 // "~/.config/openai_api_key"
                 // "~/.config/openai_api_key_bright"
                 "--doc_id_range", "0:3",
-                "--doc_type", "queries"
+                "--doc_type",
+                // "queries",
+                "documents",
+                "--prompt_as_in_query"
             ]
         },
     ]

@@ -54,6 +54,7 @@ if __name__ == '__main__':
     # parser.add_argument('--api_key', type=str, default=None)
     parser.add_argument('--doc_id_range', type=str, default=None)
     parser.add_argument('--doc_type', type=str, default="documents")
+    parser.add_argument('--prompt_as_in_query', action='store_true')
     args = parser.parse_args()
 
     if args.doc_id_range is not None:
@@ -84,15 +85,21 @@ if __name__ == '__main__':
     os.makedirs(args.output_dir, exist_ok=True)
     model_name = args.model.split("/")[-1]
     if args.doc_type == "documents":
-        output_file = os.path.join(
-            args.output_dir,
-            f"{args.task}_{model_name}_{args.output_token_limit}_{args.doc_id_range}.parquet"
+        output_file_name = (
+            f"docs_{args.prompt_as_in_query}_{args.task}_{model_name}_"
+            f"{args.output_token_limit}_{args.doc_id_range}.parquet"
         )
     else:
-        output_file = os.path.join(
-            args.output_dir,
-            f"{args.task}_{model_name}_{args.output_token_limit}_{args.doc_id_range}.json"
+        assert args.doc_type == "queries"
+        assert args.prompt_as_in_query is False
+        output_file_name = (
+            f"queries_{args.task}_{model_name}_"
+            f"{args.output_token_limit}_{args.doc_id_range}.json"
         )
+    output_file = os.path.join(
+        args.output_dir,
+        output_file_name
+    )
 
     if os.path.exists(output_file):
         print(f"{output_file} exists, skipping")
@@ -154,47 +161,55 @@ if __name__ == '__main__':
                     #     "A student needs to select 3 books from a shelf containing 10 different books. "
                     #     "How many different possible combinations of books can they choose?"
                     # )
-                    prompt = (
-                        f"Theorem or definition: {cur_doc}"
-                        f"\n\n"
-                        f"Read the theorem or definition above and generate "
-                        # f"numerous factual question-answer pairs "
-                        # f"designed to resemble authentic user "
-                        # f"search queries and natural language "
-                        # f"variations. "
-                        f"mathematical level problems"
-                        f"designed to check university students "
-                        f"ability to apply the theorem to solve the problem"
-                        f"Each problem should "
-                        f"accurately and semantically capture "
-                        f"important aspects of the theorem or definition, with "
-                        f"varying lengths and complexities that "
-                        f"mirror patterns from university practice books. "
-                        f"Include both shorter, keyword-focused "
-                        f"questions such as 'what formula is used to compute number of combinations "
-                        # f"Motors' "
-                        f"and longer questions like 'A student needs to select 3 books from a shelf containing 10 different books. "
-                        f"How many different possible combinations of books can they choose?'"
-                        # f"Avoid having very similar questions twice."
-                        f"Avoid having duplicate questions or very similar questions."
-                        f"Avoid questions similar to the examples I showed. "
-                        # f"Avoid questions about number of combinations if this concept is not mentioned in the theorem or definition. "
-                        f"Avoid using concepts not mentioned in the theorem or definition, e.g. 'number of combinations' "
-                        # f". Incorporate 'how' "
-                        # f"and 'why' questions to reflect genuine "
-                        # f"user curiosity.
-                        f"Avoid using phrases like "
-                        f"'according to the text' and abstain from "
-                        f"pronouns by specifying names or entities. "
-                        f"Ensure questions are not overly formal or "
-                        f"artificial, maintaining a natural query "
-                        f"style. "
-                        # f"Immediately follow each question "
-                        # f"with its precise answer on the same line, "
-                        # f"formatted as 'Question? Answer', without "
-                        # f"any additional formatting or commentary. "
-                        f"Each problem should have a number and be on its own line. "
-                    )
+                    if args.prompt_as_in_query:
+                        prompt = (f'{cur_doc}\n\n'
+                            f'Instructions:\n'
+                            f'1. Identify the essential problem that can be solved with this theorem or definition.\n'
+                            f'2. Think step by step to reason and describe what information could be relevant and helpful to address the problem in detail.\n'
+                            f'3. Draft an answer with as many thoughts as you have.\n'
+                        )
+                    else:
+                        prompt = (
+                            f"Theorem or definition: {cur_doc}"
+                            f"\n\n"
+                            f"Read the theorem or definition above and generate "
+                            # f"numerous factual question-answer pairs "
+                            # f"designed to resemble authentic user "
+                            # f"search queries and natural language "
+                            # f"variations. "
+                            f"mathematical level problems"
+                            f"designed to check university students "
+                            f"ability to apply the theorem to solve the problem"
+                            f"Each problem should "
+                            f"accurately and semantically capture "
+                            f"important aspects of the theorem or definition, with "
+                            f"varying lengths and complexities that "
+                            f"mirror patterns from university practice books. "
+                            f"Include both shorter, keyword-focused "
+                            f"questions such as 'what formula is used to compute number of combinations "
+                            # f"Motors' "
+                            f"and longer questions like 'A student needs to select 3 books from a shelf containing 10 different books. "
+                            f"How many different possible combinations of books can they choose?'"
+                            # f"Avoid having very similar questions twice."
+                            f"Avoid having duplicate questions or very similar questions."
+                            f"Avoid questions similar to the examples I showed. "
+                            # f"Avoid questions about number of combinations if this concept is not mentioned in the theorem or definition. "
+                            f"Avoid using concepts not mentioned in the theorem or definition, e.g. 'number of combinations' "
+                            # f". Incorporate 'how' "
+                            # f"and 'why' questions to reflect genuine "
+                            # f"user curiosity.
+                            f"Avoid using phrases like "
+                            f"'according to the text' and abstain from "
+                            f"pronouns by specifying names or entities. "
+                            f"Ensure questions are not overly formal or "
+                            f"artificial, maintaining a natural query "
+                            f"style. "
+                            # f"Immediately follow each question "
+                            # f"with its precise answer on the same line, "
+                            # f"formatted as 'Question? Answer', without "
+                            # f"any additional formatting or commentary. "
+                            f"Each problem should have a number and be on its own line. "
+                        )
                 else:
                     raise NotImplementedError(f"Task {args.task} not implemented")
                 if args.output_token_limit is not None:
