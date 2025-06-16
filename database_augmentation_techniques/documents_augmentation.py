@@ -11,10 +11,7 @@ import pyarrow.parquet as pq
 import re
 
 ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(
-    0,
-    ROOT_PATH
-)
+sys.path.insert(0, ROOT_PATH)
 # from evaluation.bright.retrievers import (
 #     get_scores,
 #     calculate_retrieval_metrics
@@ -28,6 +25,7 @@ from test_time_techniques.query_rewriting import (
     # call_api
 )
 from utility.utils import set_device_with_most_free_memory
+
 sys.path.pop(0)
 
 
@@ -37,24 +35,59 @@ DOCUMENT_POSTFIX = ""
 
 
 import logging
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                    datefmt='%m/%d/%Y %H:%M:%S')
+
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-if __name__ == '__main__':
+def get_output(model, prompt, debug, total_input_len, total_output_len):
+    if debug:
+        output = None
+    else:
+        output = model.generate(prompt)
+        total_input_len += len(prompt)
+        total_output_len += len(output)
+    return output, total_input_len, total_output_len
+
+
+def make_name(
+    doc_type,
+    task,
+    model_name,
+    output_token_limit,
+    doc_id_range,
+    debug,
+    prompt_as_in_query,
+):
+    res = f"{doc_type}_{task}_{model_name}_"
+    if output_token_limit is not None:
+        res += f"{output_token_limit}_"
+    if doc_id_range is not None:
+        res += f"{doc_id_range}"
+    if prompt_as_in_query:
+        res = "prompt_as_in_query_" + res
+    if debug:
+        res = "debug_" + res
+    return res
+
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--task', type=str, required=True)
+    parser.add_argument("--task", type=str, required=True)
     # parser.add_argument('--example_file', type=str, default=None)
-    parser.add_argument('--output_dir', type=str, default="cache/reasoning")
-    parser.add_argument('--model', type=str, default="gemini-1.5-flash")
-    parser.add_argument('--output_token_limit', type=int, default=None)
+    parser.add_argument("--output_dir", type=str, default="cache/reasoning")
+    parser.add_argument("--model", type=str, default="gemini-1.5-flash")
+    parser.add_argument("--output_token_limit", type=int, default=None)
     # parser.add_argument('--sweep_output_dir', type=str, default=None)
     # parser.add_argument('--api_key', type=str, default=None)
-    parser.add_argument('--doc_id_range', type=str, default=None)
-    parser.add_argument('--doc_type', type=str, default="documents")
-    parser.add_argument('--prompt_as_in_query', action='store_true')
+    parser.add_argument("--doc_id_range", type=str, default=None)
+    parser.add_argument("--doc_type", type=str, default="documents")
+    parser.add_argument("--prompt_as_in_query", action="store_true")
+    parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
     if args.doc_id_range is not None:
@@ -76,9 +109,13 @@ if __name__ == '__main__':
     #     examples = load_dataset('xlangai/BRIGHT', 'examples')[args.task]
 
     if args.doc_type == "documents":
-        doc_pairs = load_dataset(DATASET_SOURCE, 'documents'+DOCUMENT_POSTFIX, cache_dir=CACHE_DIR)[args.task]
+        doc_pairs = load_dataset(
+            DATASET_SOURCE, "documents" + DOCUMENT_POSTFIX, cache_dir=CACHE_DIR
+        )[args.task]
     elif args.doc_type == "queries":
-        examples = load_dataset(DATASET_SOURCE, 'examples', cache_dir=CACHE_DIR)[args.task]
+        examples = load_dataset(
+            DATASET_SOURCE, "examples", cache_dir=CACHE_DIR
+        )[args.task]
     else:
         raise ValueError(f"Invalid doc_type: {args.doc_type}")
 
@@ -86,32 +123,50 @@ if __name__ == '__main__':
     model_name = args.model.split("/")[-1]
     if args.doc_type == "documents":
         output_file_name = (
-            f"docs_{args.prompt_as_in_query}_{args.task}_{model_name}_"
-            f"{args.output_token_limit}_{args.doc_id_range}.parquet"
+            make_name(
+                args.doc_type,
+                args.task,
+                model_name,
+                args.output_token_limit,
+                args.doc_id_range,
+                args.debug,
+                prompt_as_in_query=args.prompt_as_in_query,
+            )
+            + ".parquet"
         )
     else:
         assert args.doc_type == "queries"
         assert args.prompt_as_in_query is False
         output_file_name = (
-            f"queries_{args.task}_{model_name}_"
-            f"{args.output_token_limit}_{args.doc_id_range}.json"
+            # f"queries_{args.task}_{model_name}_"
+            # f"{args.output_token_limit}_{args.doc_id_range}.json"
+            make_name(
+                args.doc_type,
+                args.task,
+                model_name,
+                args.output_token_limit,
+                args.doc_id_range,
+                args.debug,
+                prompt_as_in_query=args.prompt_as_in_query,
+            )
+            + ".json"
         )
-    output_file = os.path.join(
-        args.output_dir,
-        output_file_name
-    )
+    output_file = os.path.join(args.output_dir, output_file_name)
 
     if os.path.exists(output_file):
         print(f"{output_file} exists, skipping")
 
     else:
-
-        if 'claude' in args.model:
+        if "claude" in args.model:
             model = ClaudeModel(version=args.model)
-        elif 'gpt' in args.model:
-            model = OpenAIModel(model_name=args.model, max_tokens=args.output_token_limit)
-        elif 'gemini' in args.model:
-            model = GeminiModel(model_name=args.model, max_tokens=args.output_token_limit)
+        elif "gpt" in args.model:
+            model = OpenAIModel(
+                model_name=args.model, max_tokens=args.output_token_limit
+            )
+        elif "gemini" in args.model:
+            model = GeminiModel(
+                model_name=args.model, max_tokens=args.output_token_limit
+            )
         else:
             logger.info(f"Assuming Hugging Face model: {args.model}")
             model = HFModel(model_name=args.model, temperature=1e-9, top_p=1e-9)
@@ -123,32 +178,43 @@ if __name__ == '__main__':
 
         if args.doc_type == "queries":
             rewritten_examples = []
-            for i,e in tqdm(enumerate(examples)):
-                if doc_id_range is not None and (i < doc_id_range[0] or i >= doc_id_range[1]):
+            for i, e in tqdm(enumerate(examples)):
+                if doc_id_range is not None and (
+                    i < doc_id_range[0] or i >= doc_id_range[1]
+                ):
                     continue
-                cur_post = e["query"].replace('\n', ' ')
-                prompt = (f'{cur_post}\n\n'
-                        f'Instructions:\n'
-                        f'1. Identify the essential problem.\n'
-                        f'2. Think step by step to reason and describe what information could be relevant and helpful to address the questions in detail.\n'
-                        f'3. Draft an answer with as many thoughts as you have.\n'
-                        )
+                cur_post = e["query"].replace("\n", " ")
+                prompt = (
+                    f"{cur_post}\n\n"
+                    f"Instructions:\n"
+                    f"1. Identify the essential problem.\n"
+                    f"2. Think step by step to reason and describe what information could be relevant and helpful to address the questions in detail.\n"
+                    f"3. Draft an answer with as many thoughts as you have.\n"
+                )
                 if args.output_token_limit is not None:
-                    prompt += f'Your answer must be written within {args.output_token_limit} tokens.'
-                output = model.generate(prompt)
+                    prompt += f"Your answer must be written within {args.output_token_limit} tokens."
+
+                # output = model.generate(prompt)
+                output, total_input_len, total_output_len = get_output(
+                    model, prompt, args.debug, total_input_len, total_output_len
+                )
                 if output is not None:
-                    e['query'] = output
+                    e["query"] = output
                 rewritten_examples.append(e)
             logger.info(f"Saving rewritten examples to {output_file}")
-            with open(output_file, 'w') as f:
+            with open(output_file, "w") as f:
                 json.dump(rewritten_examples, f, indent=2)
         elif args.doc_type == "documents":
-            for doc_id, doc_content in tqdm(zip(doc_pairs["id"], doc_pairs["content"])):
+            for doc_id, doc_content in tqdm(
+                zip(doc_pairs["id"], doc_pairs["content"])
+            ):
                 # cur_post = e["query"].replace('\n', ' ')
                 doc_id = int(doc_id)
-                if doc_id_range is not None and (doc_id < doc_id_range[0] or doc_id >= doc_id_range[1]):
+                if doc_id_range is not None and (
+                    doc_id < doc_id_range[0] or doc_id >= doc_id_range[1]
+                ):
                     continue
-                cur_doc = doc_content.replace('\n', ' ')
+                cur_doc = doc_content.replace("\n", " ")
                 # prompt = (f'{cur_post}\n\n'
                 #         f'Instructions:\n'
                 #         f'1. Identify the essential problem.\n'
@@ -162,11 +228,12 @@ if __name__ == '__main__':
                     #     "How many different possible combinations of books can they choose?"
                     # )
                     if args.prompt_as_in_query:
-                        prompt = (f'{cur_doc}\n\n'
-                            f'Instructions:\n'
-                            f'1. Identify the essential problem that can be solved with this theorem or definition.\n'
-                            f'2. Think step by step to reason and describe what information could be relevant and helpful to address the problem in detail.\n'
-                            f'3. Draft an answer with as many thoughts as you have.\n'
+                        prompt = (
+                            f"{cur_doc}\n\n"
+                            f"Instructions:\n"
+                            f"1. Identify the essential problem that can be solved with this theorem or definition.\n"
+                            f"2. Think step by step to reason and describe what information could be relevant and helpful to address the problem in detail.\n"
+                            f"3. Draft an answer with as many thoughts as you have.\n"
                         )
                     else:
                         prompt = (
@@ -211,28 +278,40 @@ if __name__ == '__main__':
                             f"Each problem should have a number and be on its own line. "
                         )
                 else:
-                    raise NotImplementedError(f"Task {args.task} not implemented")
+                    raise NotImplementedError(
+                        f"Task {args.task} not implemented"
+                    )
                 if args.output_token_limit is not None:
-                    prompt += f'Your answer must be written within {args.output_token_limit} tokens.'
-                total_input_len += len(prompt)
-                output = model.generate(prompt)
-                total_output_len += len(output)
+                    prompt += f"Your answer must be written within {args.output_token_limit} tokens."
+                # total_input_len += len(prompt)
+                # output = model.generate(prompt)
+                # total_output_len += len(output)
+                output, total_input_len, total_output_len = get_output(
+                    model, prompt, args.debug, total_input_len, total_output_len
+                )
                 # if output is not None:
-                    # e['query'] = output
-                    # doc_pairs['content'][int(doc_id)] = cur_doc + "\n\n" + output
+                # e['query'] = output
+                # doc_pairs['content'][int(doc_id)] = cur_doc + "\n\n" + output
                 # rewritten_examples.append(e)
 
                 # Manually add newlines before numbered items, as LLM forgets to add them sometimes even if asked
                 # output = re.sub(r'(\d+\. )', r'\n\1', output)
-                output = re.sub(r'(\d+\. )', r'\n', output)
-                # Remove duplicate lines, keeping only the first occurrence
-                output_lines = output.split('\n')
-                output_lines = list(dict.fromkeys(output_lines))  # Preserves order while keeping first occurrence
-                output = '\n\n'.join(output_lines)
-                # Remove leading newline if present
-                output = output.lstrip('\n')
-                # use doc_content as the original document because it has \n
-                augmented_docs.append((doc_id, doc_content + "\n\n" + output))
+                if output is None:
+                    augmented_docs.append((doc_id, doc_content))
+                else:
+                    output = re.sub(r"(\d+\. )", r"\n", output)
+                    # Remove duplicate lines, keeping only the first occurrence
+                    output_lines = output.split("\n")
+                    output_lines = list(
+                        dict.fromkeys(output_lines)
+                    )  # Preserves order while keeping first occurrence
+                    output = "\n\n".join(output_lines)
+                    # Remove leading newline if present
+                    output = output.lstrip("\n")
+                    # use doc_content as the original document because it has \n
+                    augmented_docs.append(
+                        (doc_id, doc_content + "\n\n" + output)
+                    )
                 # print("DEBUG below")
                 # if doc_id > 10: # debug
                 #     break
@@ -245,10 +324,13 @@ if __name__ == '__main__':
             #     json.dump(augmented_docs, f, indent=2)
 
             # Convert to table
-            table = pa.table([
-                pa.array([doc_id for doc_id, _ in augmented_docs]),
-                pa.array([doc for _, doc in augmented_docs])
-            ], names=['doc_id', 'document'])
+            table = pa.table(
+                [
+                    pa.array([doc_id for doc_id, _ in augmented_docs]),
+                    pa.array([doc for _, doc in augmented_docs]),
+                ],
+                names=["doc_id", "document"],
+            )
 
             # Write parquet file
             pq.write_table(table, output_file)
