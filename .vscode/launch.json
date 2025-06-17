@@ -48,7 +48,11 @@
                 "--reasoning",
                 "gpt4",
                 "--batch_size",
-                "50"
+                "50",
+                "--model_name",
+                // "colbert"
+                // "random"
+                "qwen"
             ],
             "console": "integratedTerminal",
             // "justMyCode": false
