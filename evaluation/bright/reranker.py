@@ -8,6 +8,7 @@ from datasets import load_dataset
 import torch
 import prompts
 import sys
+import random
 
 sys.path.insert(
     0,
@@ -89,13 +90,56 @@ class Reranker:
                 else:
                     scores.append(0)
 
-        ranking = {doc["id"]: score for doc, score in zip(docs, scores)}
-        ranking = dict(
-            sorted(ranking.items(), key=lambda item: item[1], reverse=True)[
-                :topk
-            ]
-        )
+        ranking = make_ranking_from_docs_scores(docs, scores, topk)
         return ranking
+
+
+def make_ranking_from_docs_scores(docs, scores, topk):
+    ranking = {doc["id"]: score for doc, score in zip(docs, scores)}
+    ranking = dict(
+        sorted(ranking.items(), key=lambda item: item[1], reverse=True)[:topk]
+    )
+    return ranking
+
+
+class ColbertWrapper:
+    def __init__(self):
+        import sys
+
+        sys.path.insert(
+            0,
+            os.path.join(
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                ),
+                "external_libs",
+            ),
+        )
+        from ragatouille import RAGPretrainedModel
+
+        sys.path.pop(0)
+
+        self.rag = RAGPretrainedModel.from_pretrained("colbert-ir/colbertv2.0")
+
+    def rerank(self, docs, query, topk, batch_size=50):
+        doc_list = [doc["text"] for doc in docs]
+        ranking_results = self.rag.rerank(
+            query=query, documents=doc_list, k=len(doc_list)
+        )
+        # content of scores[0].keys(): dict_keys(['content', 'score', 'rank', 'result_index'])
+        scores = [None] * len(docs)
+        for result in ranking_results:
+            scores[result["result_index"]] = result["score"]
+        return make_ranking_from_docs_scores(docs, scores, topk)
+
+
+class RandomReranker:
+    def __init__(self):
+        pass
+
+    def rerank(self, docs, query, topk, batch_size=50):
+        scores = [random.random() for _ in range(len(docs))]
+        return make_ranking_from_docs_scores(docs, scores, topk)
 
 
 if __name__ == "__main__":
@@ -128,6 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--bm25_score_file", type=str, default=None)
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--batch_size", type=int, default=50)
+    parser.add_argument("--model_name", type=str, default="qwen")
     args = parser.parse_args()
 
     if args.reasoning is not None:
@@ -161,14 +206,24 @@ if __name__ == "__main__":
         all_scores = json.load(f)
 
     outputs_path = args.output_dir
-    score_file_path = os.path.join(outputs_path, f"{args.reasoning}_score.json")
+    score_file_path = os.path.join(
+        outputs_path, f"{args.model_name}_{args.reasoning}_score.json"
+    )
 
     if not os.path.isfile(score_file_path):
         new_scores = copy.deepcopy(all_scores)
 
-        model = Reranker(
-            args.task, device_count=1, device=get_device_with_most_free_memory()
-        )
+        if args.model_name == "colbert":
+            model = ColbertWrapper()
+        elif args.model_name == "random":
+            model = RandomReranker()
+        else:
+            assert args.model_name == "qwen"
+            model = Reranker(
+                args.task,
+                device_count=1,
+                device=get_device_with_most_free_memory(),
+            )
 
         for qid, scores in tqdm(all_scores.items()):
             docs = []
